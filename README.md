@@ -18,7 +18,7 @@ This extension adds RESTful endpoints to Keycloak to support programmatic manage
 
 ## ✅ Compatibility
 
-* Tested on **Keycloak 25**
+* Tested on **Keycloak 26**
 
 ---
 
