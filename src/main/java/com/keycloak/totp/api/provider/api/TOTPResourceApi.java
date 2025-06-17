@@ -7,6 +7,7 @@ import com.keycloak.totp.api.provider.dto.VerifyTOTPRequest;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import lombok.extern.slf4j.Slf4j;
 import org.keycloak.credential.CredentialProvider;
 import org.keycloak.credential.OTPCredentialProvider;
 import org.keycloak.models.KeycloakSession;
@@ -20,6 +21,7 @@ import org.keycloak.services.managers.AppAuthManager;
 import org.keycloak.utils.CredentialHelper;
 import org.keycloak.utils.TotpUtils;
 
+@Slf4j
 public class TOTPResourceApi {
 
     private final KeycloakSession keycloakSession;
@@ -59,12 +61,14 @@ public class TOTPResourceApi {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response generateTOTP(@PathParam("userId") String userId) {
+        log.info("Generating TOTP for user {}", userId);
         UserModel user = authenticateSessionAndGetUser(userId);
         var realm = keycloakSession.getContext().getRealm();
 
         String secret = HmacOTP.generateSecret(TOTP_SECRET_LENGTH);
         String qrCode = TotpUtils.qrCode(secret, realm, user);
         String encodedSecret = Base32.encode(secret.getBytes());
+        log.info("TOTP Generated for user {}", userId);
 
         return Response.ok(new GenerateTOTPResponse(encodedSecret, qrCode)).build();
     }
@@ -75,8 +79,9 @@ public class TOTPResourceApi {
     @Produces(MediaType.APPLICATION_JSON)
     public Response verifyTOTP(VerifyTOTPRequest request, @PathParam("userId") String userId) {
         UserModel user = authenticateSessionAndGetUser(userId);
-
+        log.info("Verifying TOTP for user {}", userId);
         if (!VerifyTOTPRequest.validate(request)) {
+            log.warn("TOTP verification failed : Invalid Request");
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity(new CommonApiResponse("Invalid request")).build();
         }
@@ -85,6 +90,7 @@ public class TOTPResourceApi {
                 .getStoredCredentialByNameAndType(request.getDeviceName(), OTPCredentialModel.TYPE);
 
         if (credentialModel == null) {
+            log.warn("TOTP verification failed : TOTP credential not found");
             return Response.status(Response.Status.UNAUTHORIZED)
                     .entity(new CommonApiResponse("TOTP credential not found")).build();
         }
@@ -108,8 +114,9 @@ public class TOTPResourceApi {
     @Produces(MediaType.APPLICATION_JSON)
     public Response registerTOTP(RegisterTOTPCredentialRequest request, @PathParam("userId") String userId) {
         UserModel user = authenticateSessionAndGetUser(userId);
-
+        log.info("Registering TOTP for user {}", userId);
         if (!RegisterTOTPCredentialRequest.validate(request)) {
+            log.warn("TOTP registration failed : Invalid Request");
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity(new CommonApiResponse("Invalid request")).build();
         }
@@ -118,6 +125,7 @@ public class TOTPResourceApi {
         String secret = new String(Base32.decode(encodedTOTP));
 
         if (secret.length() != TOTP_SECRET_LENGTH) {
+            log.warn("Totp secret does not match TOTP secret length");
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity(new CommonApiResponse("Invalid secret")).build();
         }
@@ -127,6 +135,7 @@ public class TOTPResourceApi {
                 .getStoredCredentialByNameAndType(request.getDeviceName(), OTPCredentialModel.TYPE);
 
         if (credentialModel != null && !request.isOverwrite()) {
+            log.warn("TOTP credential already exists for user = {} with deviceName = {}",userId,request.getDeviceName());
             return Response.status(Response.Status.CONFLICT)
                     .entity(new CommonApiResponse("OTP credential already exists")).build();
         }
@@ -134,16 +143,17 @@ public class TOTPResourceApi {
         OTPCredentialModel totpCredentialModel =
                 OTPCredentialModel.createFromPolicy(realm, secret, request.getDeviceName());
 
-        // ✅ Step 1: validate OTP before persisting
         boolean isValid = CredentialValidation.validOTP(
                 request.getInitialCode(), totpCredentialModel, 0);
 
         if (!isValid) {
+            log.warn("Invalid initial OTP code");
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity(new CommonApiResponse("Invalid initial OTP code")).build();
         }
 
         if(request.isOverwrite() && credentialModel != null){
+            log.info("Do OTP Overwrite because credential already exists");
             new OTPCredentialProvider(keycloakSession)
                     .deleteCredential(realm, user, credentialModel.getId());
         }
@@ -151,6 +161,7 @@ public class TOTPResourceApi {
         CredentialHelper.createOTPCredential(
                 keycloakSession, realm, user, request.getInitialCode(), totpCredentialModel);
 
+        log.info("OTP credential registered");
         return Response.status(Response.Status.CREATED)
                 .entity(new CommonApiResponse("OTP credential registered")).build();
     }
