@@ -165,4 +165,28 @@ public class TOTPResourceApi {
         return Response.status(Response.Status.CREATED)
                 .entity(new CommonApiResponse("OTP credential registered")).build();
     }
+
+    @POST
+    @Path("/{userId}/remove-totp")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response removeTOTP(RegisterTOTPCredentialRequest request, @PathParam("userId") String userId) {
+        UserModel user = authenticateSessionAndGetUser(userId);
+        log.info("Remove TOTP for user {}", userId);
+
+        var realm = keycloakSession.getContext().getRealm();
+        var credentialModel = user.credentialManager()
+                .getStoredCredentialByNameAndType(request.getDeviceName(), OTPCredentialModel.TYPE);
+
+        if (credentialModel == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new CommonApiResponse("OTP credential doesn't exist")).build();
+        }
+        new OTPCredentialProvider(keycloakSession)
+                .deleteCredential(realm, user, credentialModel.getId());
+
+        log.info("OTP credential removed");
+        return Response.status(Response.Status.OK)
+                .entity(new CommonApiResponse("OTP credential removed")).build();
+    }
 }
