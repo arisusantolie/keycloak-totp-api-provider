@@ -24,7 +24,7 @@ This extension adds RESTful endpoints to Keycloak to support programmatic manage
 
 ## 🔧 Build Instructions
 
-This project uses **Gradle** for building the JAR file.
+This project uses **Maven** for building the JAR file.
 
 ### 1. Clone the repository
 
