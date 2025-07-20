@@ -1,13 +1,11 @@
 package com.keycloak.totp.api.provider.api;
 
-import com.keycloak.totp.api.provider.dto.CommonApiResponse;
-import com.keycloak.totp.api.provider.dto.GenerateTOTPResponse;
-import com.keycloak.totp.api.provider.dto.RegisterTOTPCredentialRequest;
-import com.keycloak.totp.api.provider.dto.VerifyTOTPRequest;
+import com.keycloak.totp.api.provider.dto.*;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
+import org.keycloak.credential.CredentialModel;
 import org.keycloak.credential.CredentialProvider;
 import org.keycloak.credential.OTPCredentialProvider;
 import org.keycloak.models.KeycloakSession;
@@ -20,6 +18,10 @@ import org.keycloak.models.utils.HmacOTP;
 import org.keycloak.services.managers.AppAuthManager;
 import org.keycloak.utils.CredentialHelper;
 import org.keycloak.utils.TotpUtils;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
 
 @Slf4j
 public class TOTPResourceApi {
@@ -170,7 +172,7 @@ public class TOTPResourceApi {
     @Path("/{userId}/remove-totp")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response removeTOTP(RegisterTOTPCredentialRequest request, @PathParam("userId") String userId) {
+    public Response removeTOTP(RemoveTOTPCredentialRequest request, @PathParam("userId") String userId) {
         UserModel user = authenticateSessionAndGetUser(userId);
         log.info("Remove TOTP for user {}", userId);
 
@@ -188,5 +190,24 @@ public class TOTPResourceApi {
         log.info("OTP credential removed");
         return Response.status(Response.Status.OK)
                 .entity(new CommonApiResponse("OTP credential removed")).build();
+    }
+
+    @GET
+    @Path("/{userId}/get-totp-credentials")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response getTotpCredentials(@PathParam("userId") String userId) {
+        log.info("Get TOTP Credential for user {}", userId);
+        UserModel user = authenticateSessionAndGetUser(userId);
+
+        Stream<CredentialModel> response=user.credentialManager().getStoredCredentialsByTypeStream(OTPCredentialModel.TYPE);
+        List<String> deviceName = new ArrayList<>();
+
+        response.forEach(credentialModel -> {;
+//            log.info("Credential Name: {}", credentialModel.getUserLabel());
+            deviceName.add(credentialModel.getUserLabel());
+        });
+
+        return Response.ok(new TotpDeviceCredentialResponse(deviceName)).build();
     }
 }

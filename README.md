@@ -162,6 +162,42 @@ Validates a user-supplied TOTP code.
 }
 ```
 
+### 4. ✅ Remove TOTP Code
+
+**POST** `/remove-totp`
+Remove User TOTP code by deviceName.
+
+**Request Body**:
+
+```json
+{
+  "deviceName": "MyDevice"
+}
+```
+
+**Response**:
+
+```json
+{
+  "message": "OTP credential removed"
+}
+```
+
+### 5. ✅ Get User TOTP Credential
+
+**Get** `/get-totp-credentials`
+Get all user totp credential.
+
+**Response**:
+
+```json
+{
+  "deviceName":[
+     "MyDevice"
+  ]
+}
+```
+
 ---
 
 ## 🔐 Authentication & Permissions
